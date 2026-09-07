@@ -126,3 +126,24 @@ export const getAllInvoices = async () => {
 
   return invoices;
 };
+
+export const getAdminInvoiceById = async (
+  invoiceId: string,
+) => {
+  if (!mongoose.isValidObjectId(invoiceId)) {
+    throw new Error("Invalid invoice ID");
+  }
+
+  const invoice = await Invoice.findById(invoiceId)
+    .populate({
+      path: "clientId",
+      select: "name email companyName",
+    })
+    .lean();
+
+  if (!invoice) {
+    throw new Error("Invoice not found");
+  }
+
+  return invoice;
+};

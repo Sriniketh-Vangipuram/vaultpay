@@ -229,3 +229,77 @@ export const getAllInvoices = async (
     });
   }
 };
+
+
+export const getAdminInvoiceById = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (typeof id !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid invoice ID",
+      });
+
+      return;
+    }
+
+    const invoice =
+      await invoiceService.getAdminInvoiceById(id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        id: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+        client: invoice.clientId,
+        description: invoice.description,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        dueDate: invoice.dueDate,
+        status: invoice.status,
+        stripeCheckoutSessionId:
+          invoice.stripeCheckoutSessionId,
+        stripePaymentIntentId:
+          invoice.stripePaymentIntentId,
+        paidAt: invoice.paidAt,
+        receiptUrl: invoice.receiptUrl,
+        createdAt: invoice.createdAt,
+        updatedAt: invoice.updatedAt,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch invoice";
+
+    if (message === "Invalid invoice ID") {
+      res.status(400).json({
+        success: false,
+        message,
+      });
+
+      return;
+    }
+
+    if (message === "Invoice not found") {
+      res.status(404).json({
+        success: false,
+        message,
+      });
+
+      return;
+    }
+
+    console.error("Get admin invoice error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
