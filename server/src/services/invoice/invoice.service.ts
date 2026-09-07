@@ -76,3 +76,42 @@ export const createInvoice = async (
 
   return invoice;
 };
+
+export const getClientInvoices = async (
+  clientId: string,
+) => {
+  if (!mongoose.isValidObjectId(clientId)) {
+    throw new Error("Invalid client ID");
+  }
+
+  const invoices = await Invoice.find({
+    clientId,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return invoices;
+};
+
+export const getClientInvoiceById=async(invoiceId:string,clientId:string,)=>{
+    if(!mongoose.isValidObjectId(invoiceId)){
+        throw new Error("Invalid invoice ID");
+    }
+
+    if(!mongoose.isValidObjectId(clientId)){
+        throw new Error("Invalid client ID");
+    }
+
+    const invoice=await Invoice.findById(invoiceId).lean();
+
+    if(!invoice){
+        throw new Error("Invoice not found");
+    }
+
+    if(invoice.clientId.toString()!==clientId){
+        throw new Error("Invoice access forbidden");
+    }
+
+
+    return invoice;
+}
