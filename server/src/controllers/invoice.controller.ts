@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-import { createInvoiceSchema } from "../validators/invoice.validator.js";
+import { createInvoiceSchema , updateInvoiceSchema} from "../validators/invoice.validator.js";
 import * as invoiceService from "../services/invoice/invoice.service.js";
 
 export const createInvoice = async (
@@ -296,6 +296,96 @@ export const getAdminInvoiceById = async (
     }
 
     console.error("Get admin invoice error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const updateInvoice = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (typeof id !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid invoice ID",
+      });
+
+      return;
+    }
+
+    const result = updateInvoiceSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: result.error.flatten().fieldErrors,
+      });
+
+      return;
+    }
+
+    const invoice = await invoiceService.updateInvoice(
+      id,
+      result.data,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Invoice updated successfully",
+      data: {
+        id: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+        clientId: invoice.clientId.toString(),
+        description: invoice.description,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        dueDate: invoice.dueDate,
+        status: invoice.status,
+        createdAt: invoice.createdAt,
+        updatedAt: invoice.updatedAt,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to update invoice";
+
+    if (
+      message === "Invalid invoice ID" ||
+      message === "Invoice not found"
+    ) {
+      res.status(
+        message === "Invoice not found" ? 404 : 400,
+      ).json({
+        success: false,
+        message,
+      });
+
+      return;
+    }
+
+    if (
+      message === "Paid invoices cannot be modified" ||
+      message === "Cancelled invoices cannot be modified"
+    ) {
+      res.status(409).json({
+        success: false,
+        message,
+      });
+
+      return;
+    }
+
+    console.error("Update invoice error:", error);
 
     res.status(500).json({
       success: false,

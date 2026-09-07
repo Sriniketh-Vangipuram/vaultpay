@@ -35,4 +35,47 @@ export const createInvoiceSchema=z.object({
 });
 
 
+export const updateInvoiceSchema = z
+  .object({
+    description: z
+      .string()
+      .trim()
+      .min(1, "Description is required")
+      .max(500, "Description is too long")
+      .optional(),
+
+    amount: z
+      .number()
+      .positive("Amount must be greater than zero")
+      .finite("Amount must be a valid number")
+      .optional(),
+
+    currency: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(
+        /^[a-z]{3}$/,
+        "Currency must be a valid 3-letter currency code",
+      )
+      .optional(),
+
+    dueDate: z
+      .string()
+      .datetime({
+        offset: true,
+      })
+      .transform((value) => new Date(value))
+      .optional(),
+  })
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    {
+      message: "At least one field must be provided",
+    },
+  );
+
+export type UpdateInvoiceInput = z.infer< typeof updateInvoiceSchema >;
+
+
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;

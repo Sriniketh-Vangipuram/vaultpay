@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Invoice from "../../models/Invoice.js";
 import InvoiceCounter from "../../models/InvoiceCounter.js";
 import User from "../../models/User.js";
+import type { UpdateInvoiceInput } from "../../validators/invoice.validator.js";
 
 interface CreateInvoiceInput {
   clientId: string;
@@ -144,6 +145,49 @@ export const getAdminInvoiceById = async (
   if (!invoice) {
     throw new Error("Invoice not found");
   }
+
+  return invoice;
+};
+
+export const updateInvoice = async (
+  invoiceId: string,
+  input: UpdateInvoiceInput,
+) => {
+  if (!mongoose.isValidObjectId(invoiceId)) {
+    throw new Error("Invalid invoice ID");
+  }
+
+  const invoice = await Invoice.findById(invoiceId);
+
+  if (!invoice) {
+    throw new Error("Invoice not found");
+  }
+
+  if (invoice.status === "PAID") {
+    throw new Error("Paid invoices cannot be modified");
+  }
+
+  if (invoice.status === "CANCELLED") {
+    throw new Error("Cancelled invoices cannot be modified");
+  }
+
+  if (input.description !== undefined) {
+    invoice.description = input.description;
+  }
+
+  if (input.amount !== undefined) {
+    invoice.amount = input.amount;
+  }
+
+  if (input.currency !== undefined) {
+    invoice.currency = input.currency;
+  }
+
+  if (input.dueDate !== undefined) {
+    invoice.dueDate = input.dueDate;
+  }
+
+  await invoice.save();
 
   return invoice;
 };

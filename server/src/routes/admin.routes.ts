@@ -1,7 +1,11 @@
 import { Router } from "express";
 
-import { createInvoice,getAllInvoices,getAdminInvoiceById } from "../controllers/invoice.controller.js";
-import { authenticate } from "../middlewares/auth.middleware.js";
+import {
+  createInvoice,
+  getAdminInvoiceById,
+  getAllInvoices,
+  updateInvoice,
+} from "../controllers/invoice.controller.js";import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/rbac.middleware.js";
 
 const router = Router();
@@ -27,5 +31,11 @@ router.get(
   getAdminInvoiceById,
 );
 
+router.patch(
+  "/invoices/:id",
+  authenticate,
+  authorize("ADMIN"),
+  updateInvoice,
+);
 
 export default router;
