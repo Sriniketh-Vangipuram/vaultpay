@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/scripts/seedUsers.ts",
+    "test:payment-provider": "tsx src/scripts/testPaymentProvider.ts",
     "create:test-client": "tsx src/scripts/createTestClient.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
