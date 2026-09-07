@@ -4,6 +4,9 @@ import helmet from "helmet";
 
 import authRoutes from "./routes/auth.routes.js";
 import testRoutes from "./routes/test.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+
+
 
 const app = express();
 
@@ -19,6 +22,7 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/test", testRoutes);
 
 app.get("/api/health", (_req, res) => {
