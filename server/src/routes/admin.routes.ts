@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { createInvoice } from "../controllers/invoice.controller.js";
+import { createInvoice,getAllInvoices } from "../controllers/invoice.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/rbac.middleware.js";
 
@@ -11,6 +11,13 @@ router.post(
   authenticate,
   authorize("ADMIN"),
   createInvoice,
+);
+
+router.get(
+  "/invoices",
+  authenticate,
+  authorize("ADMIN"),
+  getAllInvoices,
 );
 
 export default router;

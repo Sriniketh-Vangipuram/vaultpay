@@ -133,7 +133,7 @@ export const getClientInvoiceById = async (
 
         return;
     }
-    
+
     const invoice = await invoiceService.getClientInvoiceById(
       id,
       req.user.id,
@@ -188,6 +188,40 @@ export const getClientInvoiceById = async (
     }
 
     console.error("Get client invoice error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const getAllInvoices = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const invoices = await invoiceService.getAllInvoices();
+
+    res.status(200).json({
+      success: true,
+      data: invoices.map((invoice) => ({
+        id: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+        client: invoice.clientId,
+        description: invoice.description,
+        amount: invoice.amount,
+        currency: invoice.currency,
+        dueDate: invoice.dueDate,
+        status: invoice.status,
+        paidAt: invoice.paidAt,
+        receiptUrl: invoice.receiptUrl,
+        createdAt: invoice.createdAt,
+        updatedAt: invoice.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get all invoices error:", error);
 
     res.status(500).json({
       success: false,

@@ -112,6 +112,17 @@ export const getClientInvoiceById=async(invoiceId:string,clientId:string,)=>{
         throw new Error("Invoice access forbidden");
     }
 
-
     return invoice;
-}
+};
+
+export const getAllInvoices = async () => {
+  const invoices = await Invoice.find()
+    .populate({
+      path: "clientId",
+      select: "name email companyName",
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return invoices;
+};
