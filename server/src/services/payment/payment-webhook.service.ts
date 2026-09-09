@@ -141,10 +141,18 @@ export const processPaymentWebhook =
     // --------------------------------------------------
 
     const existingPayment =
-      await Payment.findOne({
-        providerPaymentId:
-          event.paymentId,
-      });
+    await Payment.findOne({
+      $or: [
+        {
+          providerPaymentId:
+            event.paymentId,
+        },
+        {
+          providerCheckoutSessionId:
+            event.checkoutSessionId,
+        },
+      ],
+    });
 
     if (existingPayment) {
       console.log(
@@ -177,6 +185,16 @@ export const processPaymentWebhook =
     // --------------------------------------------------
     // 9. Create payment record
     // --------------------------------------------------
+
+    if (
+      event.amount !== invoice.amount ||
+      event.currency.toLowerCase() !==
+        invoice.currency.toLowerCase()
+    ) {
+      throw new Error(
+        "Webhook payment amount or currency does not match invoice",
+      );
+    }
 
     await Payment.create({
       invoiceId:
