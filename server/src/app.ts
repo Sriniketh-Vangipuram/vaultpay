@@ -8,7 +8,9 @@ import adminRoutes from "./routes/admin.routes.js";
 import clientRoutes from "./routes/client.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
-
+import {
+  testReceiptPdf,
+} from "./controllers/pdf.controller.js";
 
 const app = express();
 
@@ -50,5 +52,10 @@ app.get("/api/health", (_req, res) => {
     message: "VaultPay API is running",
   });
 });
+
+app.get(
+  "/api/test/receipt-pdf",
+  testReceiptPdf,
+);
 
 export default app;

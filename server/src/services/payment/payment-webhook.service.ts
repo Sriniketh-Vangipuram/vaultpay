@@ -7,6 +7,11 @@ import type {
   PaymentWebhookEvent,
 } from "./payment-provider.interface.js";
 
+import User from "../../models/User.js";
+import {
+  generateReceiptPdf,
+} from "../pdf/receipt-pdf.service.js";
+
 type PaymentProviderName =
   | "MOCK"
   | "STRIPE";
@@ -243,6 +248,41 @@ export const processPaymentWebhook =
       new Date();
 
     await invoice.save();
+
+    const client = await User.findById(
+      event.clientId,
+    ).lean();
+
+    if (!client) {
+      throw new Error(
+        "Client referenced by payment does not exist",
+      );
+    }
+
+    const receiptPdf =
+      await generateReceiptPdf({
+        invoiceNumber:
+          invoice.invoiceNumber,
+        clientName:
+          client.name,
+        companyName:
+          client.companyName,
+        clientEmail:
+          client.email,
+        description:
+          invoice.description,
+        amount:
+          invoice.amount,
+        currency:
+          invoice.currency,
+        paidAt:
+          invoice.paidAt,
+      });
+
+    console.log(
+      `Receipt PDF generated: ${receiptPdf.length} bytes`,
+    );
+
 
     // --------------------------------------------------
     // 11. Record webhook as processed
