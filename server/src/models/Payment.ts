@@ -1,16 +1,25 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, {
+  Document,
+  Schema,
+} from "mongoose";
 
 export type PaymentStatus =
   | "PENDING"
   | "SUCCEEDED"
   | "FAILED";
 
+export type PaymentProvider =
+  | "MOCK"
+  | "STRIPE";
+
 export interface IPayment extends Document {
   invoiceId: mongoose.Types.ObjectId;
   clientId: mongoose.Types.ObjectId;
 
-  stripePaymentIntentId?: string;
-  stripeCheckoutSessionId?: string;
+  provider: PaymentProvider;
+
+  providerPaymentId?: string;
+  providerCheckoutSessionId?: string;
 
   amount: number;
   currency: string;
@@ -38,14 +47,21 @@ const paymentSchema = new Schema<IPayment>(
       index: true,
     },
 
-    stripePaymentIntentId: {
+    provider: {
+      type: String,
+      enum: ["MOCK", "STRIPE"],
+      required: true,
+      index: true,
+    },
+
+    providerPaymentId: {
       type: String,
       sparse: true,
       unique: true,
       index: true,
     },
 
-    stripeCheckoutSessionId: {
+    providerCheckoutSessionId: {
       type: String,
       sparse: true,
       unique: true,

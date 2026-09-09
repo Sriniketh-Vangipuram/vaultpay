@@ -261,10 +261,11 @@ export const getAdminInvoiceById = async (
         currency: invoice.currency,
         dueDate: invoice.dueDate,
         status: invoice.status,
-        stripeCheckoutSessionId:
-          invoice.stripeCheckoutSessionId,
-        stripePaymentIntentId:
-          invoice.stripePaymentIntentId,
+        providerCheckoutSessionId:
+          invoice.providerCheckoutSessionId,
+
+        providerPaymentId:
+          invoice.providerPaymentId,
         paidAt: invoice.paidAt,
         receiptUrl: invoice.receiptUrl,
         createdAt: invoice.createdAt,

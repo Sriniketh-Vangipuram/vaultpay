@@ -27,7 +27,7 @@ export interface PaymentWebhookEvent {
   clientId: string;
 
   checkoutSessionId: string;
-  paymentIntentId: string;
+  paymentId: string;
 
   amount: number;
   currency: string;
@@ -36,7 +36,6 @@ export interface PaymentWebhookEvent {
 
   paidAt?: Date;
 }
-
 export interface PaymentProvider {
   createCheckoutSession(
     input: CreateCheckoutSessionInput,

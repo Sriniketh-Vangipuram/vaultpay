@@ -1,10 +1,14 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, {
+  Document,
+  Schema,
+} from "mongoose";
 
 export interface IWebhookEvent extends Document {
-  stripeEventId: string;
+  providerEventId: string;
   eventType: string;
   processed: boolean;
   processedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -12,7 +16,7 @@ export interface IWebhookEvent extends Document {
 const webhookEventSchema =
   new Schema<IWebhookEvent>(
     {
-      stripeEventId: {
+      providerEventId: {
         type: String,
         required: true,
         unique: true,

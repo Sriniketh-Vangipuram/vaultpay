@@ -16,8 +16,8 @@ export interface IInvoice extends Document {
   dueDate: Date;
   status: InvoiceStatus;
 
-  stripeCheckoutSessionId?: string;
-  stripePaymentIntentId?: string;
+  providerCheckoutSessionId?: string;
+  providerPaymentId?: string;
 
   paidAt?: Date;
   receiptUrl?: string;
@@ -82,13 +82,13 @@ const invoiceSchema = new Schema<IInvoice>(
       index: true,
     },
 
-    stripeCheckoutSessionId: {
+    providerCheckoutSessionId: {
       type: String,
       sparse: true,
       index: true,
     },
 
-    stripePaymentIntentId: {
+    providerPaymentId: {
       type: String,
       sparse: true,
       index: true,
