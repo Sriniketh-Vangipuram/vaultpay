@@ -21,6 +21,12 @@ interface MockCheckoutSession {
   customerEmail: string;
   idempotencyKey: string;
 }
+export interface MockPaymentCompletion {
+  eventId: string;
+  paymentId: string;
+  payload: Buffer;
+  signature: string;
+}
 
 export class MockPaymentProvider
   implements PaymentProvider
@@ -134,4 +140,57 @@ export class MockPaymentProvider
       .update(payload)
       .digest("hex");
   }
+
+  generateSuccessfulPaymentWebhook(
+  sessionId: string,
+): MockPaymentCompletion {
+  const session = this.sessions.get(sessionId);
+
+  if (!session) {
+    throw new Error(
+      "Mock checkout session not found",
+    );
+  }
+
+  const eventId =
+    `mock_evt_${randomUUID()}`;
+
+  const paymentId =
+    `mock_pi_${randomUUID()}`;
+
+  const payload = Buffer.from(
+    JSON.stringify({
+      eventId,
+      eventType:
+        "payment.succeeded",
+      invoiceId:
+        session.invoiceId,
+      clientId:
+        session.clientId,
+      checkoutSessionId:
+        session.sessionId,
+      paymentId,
+      amount:
+        session.amount,
+      currency:
+        session.currency,
+      status:
+        "SUCCEEDED",
+      paidAt:
+        new Date().toISOString(),
+    }),
+  );
+
+  const signature =
+    this.generateWebhookSignature(
+      payload,
+    );
+
+  return {
+    eventId,
+    paymentId,
+    payload,
+    signature,
+  };
+}
 }

@@ -11,6 +11,11 @@ import {
   createCheckoutSession,
 } from "../services/payment/payment.service.js";
 
+
+import {
+  completeMockPayment,
+} from "../services/payment/mock/mock-payment.service.js";
+
 export const createPaymentCheckout =
   async (
     req: Request,
@@ -201,6 +206,81 @@ export const createPaymentCheckout =
         success: false,
         message:
           "Internal server error",
+      });
+    }
+  };
+
+  export const completeMockPaymentController =
+  async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message:
+            "Authentication required",
+        });
+
+        return;
+      }
+
+      const {
+        sessionId,
+      } = req.body as {
+        sessionId?: string;
+      };
+
+      if (
+        !sessionId ||
+        typeof sessionId !== "string"
+      ) {
+        res.status(400).json({
+          success: false,
+          message:
+            "sessionId is required",
+        });
+
+        return;
+      }
+
+      await completeMockPayment(
+        sessionId,
+      );
+
+      res.status(200).json({
+        success: true,
+        message:
+          "Mock payment completed",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Mock payment failed";
+
+      if (
+        message ===
+        "Mock checkout session not found"
+      ) {
+        res.status(404).json({
+          success: false,
+          message,
+        });
+
+        return;
+      }
+
+      console.error(
+        "Mock payment completion error:",
+        error,
+      );
+
+      res.status(500).json({
+        success: false,
+        message:
+          "Mock payment failed",
       });
     }
   };
