@@ -7,6 +7,8 @@ import testRoutes from "./routes/test.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import clientRoutes from "./routes/client.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
+import webhookRoutes from "./routes/webhook.routes.js";
+
 
 const app = express();
 
@@ -18,6 +20,21 @@ app.use(
     credentials: true,
   }),
 );
+
+// --------------------------------------------------
+// Webhook routes MUST come before express.json()
+// --------------------------------------------------
+
+app.use(
+  "/api/webhooks",
+  express.raw({
+    type: "application/json",
+  }),
+  webhookRoutes,
+);
+
+
+// Normal JSON API routes
 
 app.use(express.json());
 
