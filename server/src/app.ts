@@ -12,6 +12,8 @@ import {
   testReceiptPdf,
 } from "./controllers/pdf.controller.js";
 
+import receiptRoutes from "./routes/receipt.routes.js";
+
 const app = express();
 
 app.use(helmet());
@@ -44,6 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/client", clientRoutes);
 app.use("/api/payments",paymentRoutes);
+app.use("/api", receiptRoutes);
 app.use("/api/test", testRoutes);
 
 app.get("/api/health", (_req, res) => {
