@@ -1,328 +1,247 @@
 import mongoose from "mongoose";
 
-import Invoice from "../../models/Invoice.js";
+import Invoice, { type IInvoice,} from "../../models/Invoice.js";
 import Payment from "../../models/Payment.js";
-import WebhookEvent from "../../models/WebhookEvent.js";
-import type { PaymentWebhookEvent,} from "./payment-provider.interface.js";
-
 import User from "../../models/User.js";
-import { generateReceiptPdf,} from "../pdf/receipt-pdf.service.js";
+import WebhookEvent from "../../models/WebhookEvent.js";
 
-
+import { generateReceiptPdf } from "../pdf/receipt-pdf.service.js";
+import { uploadReceiptPdf } from "../pdf/receipt-storage.service.js";
 import { sendReceiptEmail } from "../email/receipt-email.service.js";
 
-import { uploadReceiptPdf } from "../pdf/receipt-storage.service.js";
+import type { PaymentWebhookEvent } from "./payment-provider.interface.js";
 
-type PaymentProviderName =
-  | "MOCK"
-  | "STRIPE";
+type PaymentProviderName = "MOCK" | "STRIPE";
 
-const getPaymentProviderName =
-  (): PaymentProviderName => {
-    const provider =
-      (
-        process.env.PAYMENT_PROVIDER ??
-        "mock"
-      ).toUpperCase();
+const getPaymentProviderName = (): PaymentProviderName => {
+  const provider = (process.env.PAYMENT_PROVIDER ?? "mock").toUpperCase();
 
-    if (
-      provider !== "MOCK" &&
-      provider !== "STRIPE"
-    ) {
-      throw new Error(
-        `Unsupported payment provider: ${provider}`,
-      );
-    }
+  if (provider !== "MOCK" && provider !== "STRIPE") {
+    throw new Error(`Unsupported payment provider: ${provider}`);
+  }
 
-    return provider;
-  };
+  return provider;
+};
 
-export const processPaymentWebhook =
-  async (
-    event: PaymentWebhookEvent,
-  ): Promise<void> => {
-    // --------------------------------------------------
-    // 1. Check whether this webhook was already
-    //    processed
-    // --------------------------------------------------
+const generateAndDeliverReceipt = async (
+  invoice: mongoose.HydratedDocument<IInvoice>,
+  client: {
+    name: string;
+    email: string;
+    companyName?: string;
+  },
+): Promise<string> => {
+  const receiptPdf = await generateReceiptPdf({
+    invoiceNumber: invoice.invoiceNumber,
+    clientName: client.name,
+    companyName: client.companyName,
+    clientEmail: client.email,
+    description: invoice.description,
+    amount: invoice.amount,
+    currency: invoice.currency,
+    paidAt: invoice.paidAt ?? new Date(),
+  });
 
-    const existingEvent =
-      await WebhookEvent.findOne({
-        providerEventId:
-          event.eventId,
-      });
+  console.log(`Receipt PDF generated: ${receiptPdf.length} bytes`);
 
-    if (existingEvent) {
-      console.log(
-        `Webhook ${event.eventId} already processed`,
-      );
+  const receiptUrl = await uploadReceiptPdf(
+    receiptPdf,
+    invoice.invoiceNumber,
+  );
 
-      return;
-    }
+  console.log(`Receipt uploaded: ${receiptUrl}`);
 
-    // --------------------------------------------------
-    // 2. Validate invoice ID
-    // --------------------------------------------------
+  await sendReceiptEmail({
+    recipientEmail: client.email,
+    clientName: client.name,
+    invoiceNumber: invoice.invoiceNumber,
+    amount: invoice.amount,
+    currency: invoice.currency,
+    pdfBuffer: receiptPdf,
+  });
 
-    if (
-      !mongoose.isValidObjectId(
-        event.invoiceId,
-      )
-    ) {
-      throw new Error(
-        "Invalid invoice ID in webhook",
-      );
-    }
+  console.log(`Receipt email sent to ${client.email}`);
 
-    // --------------------------------------------------
-    // 3. Validate client ID
-    // --------------------------------------------------
+  return receiptUrl;
+};
 
-    if (
-      !mongoose.isValidObjectId(
-        event.clientId,
-      )
-    ) {
-      throw new Error(
-        "Invalid client ID in webhook",
-      );
-    }
+export const processPaymentWebhook = async (
+  event: PaymentWebhookEvent,
+): Promise<void> => {
+  const existingEvent = await WebhookEvent.findOne({
+    providerEventId: event.eventId,
+  });
 
-    // --------------------------------------------------
-    // 4. Find invoice
-    // --------------------------------------------------
+  if (existingEvent) {
+    console.log(`Webhook ${event.eventId} already processed`);
+    return;
+  }
 
-    const invoice =
-      await Invoice.findById(
-        event.invoiceId,
-      );
+  if (!mongoose.isValidObjectId(event.invoiceId)) {
+    throw new Error("Invalid invoice ID in webhook");
+  }
 
-    if (!invoice) {
-      throw new Error(
-        "Invoice referenced by webhook not found",
-      );
-    }
+  if (!mongoose.isValidObjectId(event.clientId)) {
+    throw new Error("Invalid client ID in webhook");
+  }
 
-    // --------------------------------------------------
-    // 5. Verify invoice ownership
-    // --------------------------------------------------
+  const invoice = await Invoice.findById(event.invoiceId);
 
-    if (
-      invoice.clientId.toString() !==
-      event.clientId
-    ) {
-      throw new Error(
-        "Webhook client does not own invoice",
-      );
-    }
+  if (!invoice) {
+    throw new Error("Invoice referenced by webhook not found");
+  }
 
-    // --------------------------------------------------
-    // 6. Only successful payments can mark an
-    //    invoice as PAID
-    // --------------------------------------------------
+  if (invoice.clientId.toString() !== event.clientId) {
+    throw new Error("Webhook client does not own invoice");
+  }
 
-    if (event.status !== "SUCCEEDED") {
-      console.log(
-        `Payment event ${event.eventId} status: ${event.status}`,
-      );
-
-      await WebhookEvent.create({
-        providerEventId:
-          event.eventId,
-
-        eventType:
-          event.eventType,
-
-        processed: true,
-
-        processedAt:
-          new Date(),
-      });
-
-      return;
-    }
-
-    // --------------------------------------------------
-    // 7. Check whether payment already exists
-    // --------------------------------------------------
-
-    const existingPayment =
-    await Payment.findOne({
-      $or: [
-        {
-          providerPaymentId:
-            event.paymentId,
-        },
-        {
-          providerCheckoutSessionId:
-            event.checkoutSessionId,
-        },
-      ],
-    });
-
-    if (existingPayment) {
-      console.log(
-        `Payment ${event.paymentId} already exists`,
-      );
-
-      await WebhookEvent.create({
-        providerEventId:
-          event.eventId,
-
-        eventType:
-          event.eventType,
-
-        processed: true,
-
-        processedAt:
-          new Date(),
-      });
-
-      return;
-    }
-
-    // --------------------------------------------------
-    // 8. Determine configured provider
-    // --------------------------------------------------
-
-    const provider =
-      getPaymentProviderName();
-
-    // --------------------------------------------------
-    // 9. Create payment record
-    // --------------------------------------------------
-
-    if (
-      event.amount !== invoice.amount ||
-      event.currency.toLowerCase() !==
-        invoice.currency.toLowerCase()
-    ) {
-      throw new Error(
-        "Webhook payment amount or currency does not match invoice",
-      );
-    }
-
-    await Payment.create({
-      invoiceId:
-        event.invoiceId,
-
-      clientId:
-        event.clientId,
-
-      provider,
-
-      providerPaymentId:
-        event.paymentId,
-
-      providerCheckoutSessionId:
-        event.checkoutSessionId,
-
-      amount:
-        event.amount,
-
-      currency:
-        event.currency,
-
-      status: "SUCCEEDED",
-
-      paidAt:
-        event.paidAt ??
-        new Date(),
-    });
-
-    // --------------------------------------------------
-    // 10. Mark invoice as PAID
-    //
-    // The verified webhook is the source of truth.
-    // --------------------------------------------------
-
-    invoice.status = "PAID";
-
-    invoice.providerPaymentId =
-      event.paymentId;
-
-    invoice.providerCheckoutSessionId =
-      event.checkoutSessionId;
-
-    invoice.paidAt =
-      event.paidAt ??
-      new Date();
-
-    await invoice.save();
-
-    const client = await User.findById(
-      event.clientId,
-    ).lean();
-
-    if (!client) {
-      throw new Error(
-        "Client referenced by payment does not exist",
-      );
-    }
-
-    const receiptPdf =
-      await generateReceiptPdf({
-        invoiceNumber:
-          invoice.invoiceNumber,
-        clientName:
-          client.name,
-        companyName:
-          client.companyName,
-        clientEmail:
-          client.email,
-        description:
-          invoice.description,
-        amount:
-          invoice.amount,
-        currency:
-          invoice.currency,
-        paidAt:
-          invoice.paidAt,
-      });
-
+  if (event.status !== "SUCCEEDED") {
     console.log(
-      `Receipt PDF generated: ${receiptPdf.length} bytes`,
+      `Payment event ${event.eventId} status: ${event.status}`,
     );
 
-    const receiptUrl = await uploadReceiptPdf(
-      receiptPdf,
-      invoice.invoiceNumber,
+    await WebhookEvent.create({
+      providerEventId: event.eventId,
+      eventType: event.eventType,
+      processed: true,
+      processedAt: new Date(),
+    });
+
+    return;
+  }
+
+  if (
+    event.amount !== invoice.amount ||
+    event.currency.toLowerCase() !== invoice.currency.toLowerCase()
+  ) {
+    throw new Error(
+      "Webhook payment amount or currency does not match invoice",
+    );
+  }
+
+  const client = await User.findOne({
+    _id: event.clientId,
+    role: "CLIENT",
+    isActive: true,
+  }).lean();
+
+  if (!client) {
+    throw new Error(
+      "Client referenced by payment does not exist",
+    );
+  }
+
+  /*
+   * Check whether this payment already exists.
+   *
+   * This protects against duplicate webhook deliveries
+   * and also lets us recover from failures that happened
+   * after the payment was recorded.
+   */
+  const existingPayment = await Payment.findOne({
+    $or: [
+      { providerPaymentId: event.paymentId },
+      {
+        providerCheckoutSessionId:
+          event.checkoutSessionId,
+      },
+    ],
+  });
+
+  if (existingPayment) {
+    console.log(
+      `Payment ${event.paymentId} already exists`,
+    );
+
+    /*
+     * Payment is already confirmed and receipt delivery
+     * completed successfully.
+     */
+    if (invoice.receiptUrl) {
+      await WebhookEvent.create({
+        providerEventId: event.eventId,
+        eventType: event.eventType,
+        processed: true,
+        processedAt: new Date(),
+      });
+
+      return;
+    }
+
+    /*
+     * Payment exists but receipt delivery failed earlier.
+     * Retry the receipt generation/upload/email process.
+     */
+    console.log(
+      `Receipt missing for ${invoice.invoiceNumber}. Retrying receipt delivery...`,
+    );
+
+    const receiptUrl = await generateAndDeliverReceipt(
+      invoice,
+      client,
     );
 
     invoice.receiptUrl = receiptUrl;
+
     await invoice.save();
 
-    console.log(`Receipt uploaded: ${receiptUrl}`);
-
-    await sendReceiptEmail({
-      recipientEmail:client.email,
-      clientName:client.name,
-      invoiceNumber:invoice.invoiceNumber,
-      amount:invoice.amount,
-      currency:invoice.currency,
-      pdfBuffer:receiptPdf,
-    });
-
-    console.log(`Receipt email sent to ${client.email}`);
-
-    // --------------------------------------------------
-    // 11. Record webhook as processed
-    // --------------------------------------------------
-
     await WebhookEvent.create({
-      providerEventId:
-        event.eventId,
-
-      eventType:
-        event.eventType,
-
+      providerEventId: event.eventId,
+      eventType: event.eventType,
       processed: true,
-
-      processedAt:
-        new Date(),
+      processedAt: new Date(),
     });
 
     console.log(
-      `Payment confirmed for invoice ${invoice.invoiceNumber}`,
+      `Receipt successfully recovered for ${invoice.invoiceNumber}`,
     );
-  };
+
+    return;
+  }
+
+  const provider = getPaymentProviderName();
+
+  /*
+   * Create the payment record only after all webhook
+   * authenticity and invoice validation checks succeed.
+   */
+  await Payment.create({
+    invoiceId: event.invoiceId,
+    clientId: event.clientId,
+    provider,
+    providerPaymentId: event.paymentId,
+    providerCheckoutSessionId: event.checkoutSessionId,
+    amount: event.amount,
+    currency: event.currency,
+    status: "SUCCEEDED",
+    paidAt: event.paidAt ?? new Date(),
+  });
+
+  invoice.status = "PAID";
+  invoice.providerPaymentId = event.paymentId;
+  invoice.providerCheckoutSessionId =
+    event.checkoutSessionId;
+  invoice.paidAt = event.paidAt ?? new Date();
+
+  await invoice.save();
+
+  const receiptUrl = await generateAndDeliverReceipt(
+    invoice,
+    client,
+  );
+
+  invoice.receiptUrl = receiptUrl;
+
+  await invoice.save();
+
+  await WebhookEvent.create({
+    providerEventId: event.eventId,
+    eventType: event.eventType,
+    processed: true,
+    processedAt: new Date(),
+  });
+
+  console.log(
+    `Payment confirmed for invoice ${invoice.invoiceNumber}`,
+  );
+};
