@@ -3,14 +3,15 @@ import mongoose from "mongoose";
 import Invoice from "../../models/Invoice.js";
 import Payment from "../../models/Payment.js";
 import WebhookEvent from "../../models/WebhookEvent.js";
-import type {
-  PaymentWebhookEvent,
-} from "./payment-provider.interface.js";
+import type { PaymentWebhookEvent,} from "./payment-provider.interface.js";
 
 import User from "../../models/User.js";
-import {
-  generateReceiptPdf,
-} from "../pdf/receipt-pdf.service.js";
+import { generateReceiptPdf,} from "../pdf/receipt-pdf.service.js";
+
+
+import { sendReceiptEmail } from "../email/receipt-email.service.js";
+
+import { uploadReceiptPdf } from "../pdf/receipt-storage.service.js";
 
 type PaymentProviderName =
   | "MOCK"
@@ -283,6 +284,26 @@ export const processPaymentWebhook =
       `Receipt PDF generated: ${receiptPdf.length} bytes`,
     );
 
+    const receiptUrl = await uploadReceiptPdf(
+      receiptPdf,
+      invoice.invoiceNumber,
+    );
+
+    invoice.receiptUrl = receiptUrl;
+    await invoice.save();
+
+    console.log(`Receipt uploaded: ${receiptUrl}`);
+
+    await sendReceiptEmail({
+      recipientEmail:client.email,
+      clientName:client.name,
+      invoiceNumber:invoice.invoiceNumber,
+      amount:invoice.amount,
+      currency:invoice.currency,
+      pdfBuffer:receiptPdf,
+    });
+
+    console.log(`Receipt email sent to ${client.email}`);
 
     // --------------------------------------------------
     // 11. Record webhook as processed
