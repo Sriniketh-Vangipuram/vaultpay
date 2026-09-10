@@ -1,25 +1,12 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const smtpHost = process.env.SMTP_HOST;
-const smtpPort = Number(process.env.SMTP_PORT);
-const smtpUser = process.env.SMTP_USER;
-const smtpPassword = process.env.SMTP_PASSWORD;
+const resendApiKey = process.env.RESEND_API_KEY;
 
-if (!smtpHost || !smtpPort || !smtpUser || !smtpPassword) {
-  throw new Error("SMTP environment variables are not configured");
+if (!resendApiKey) {
+  throw new Error("RESEND_API_KEY is not configured");
 }
 
-const transporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: true,
+export const resend = new Resend(resendApiKey);
 
-  auth: {
-    user: smtpUser,
-    pass: smtpPassword,
-  },
-});
-
-
-
-export default transporter;
+export const resendFromEmail =
+  process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";

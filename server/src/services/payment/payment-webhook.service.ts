@@ -52,13 +52,10 @@ const generateAndDeliverReceipt = async (
   console.log(`Receipt uploaded: ${receiptUrl}`);
 
   await sendReceiptEmail({
-    recipientEmail: client.email,
-    clientName: client.name,
-    invoiceNumber: invoice.invoiceNumber,
-    amount: invoice.amount,
-    currency: invoice.currency,
-    pdfBuffer: receiptPdf,
-  });
+  invoice,
+  client,
+  receiptPdf,
+});
 
   console.log(`Receipt email sent to ${client.email}`);
 

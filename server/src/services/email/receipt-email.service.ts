@@ -1,82 +1,59 @@
-import transporter from "../../config/email";
+import { resend, resendFromEmail } from "../../config/email";
+import type { IInvoice } from "../../models/Invoice";
 
-
-interface ReceiptEmailInput{
-    recipientEmail:string;
-    clientName:string;
-    invoiceNumber:string;
-    amount:number;
-    currency:string;
-    pdfBuffer:Buffer;
+interface ReceiptClient {
+  name: string;
+  email: string;
+  companyName?: string;
 }
 
-const formatCurrency=(amount:number,currency:string):string=>{
+interface SendReceiptEmailInput {
+  invoice: IInvoice;
+  client: ReceiptClient;
+  receiptPdf: Buffer;
+}
 
-    return new Intl.NumberFormat("en-US",{
-        style:"currency",
-        currency:currency.toUpperCase(),
-    }).format(amount);
-};
+export const sendReceiptEmail = async ({
+  invoice,
+  client,
+  receiptPdf,
+}: SendReceiptEmailInput): Promise<void> => {
+  const result = await resend.emails.send({
+    from: resendFromEmail,
+    to: client.email,
+    subject: `Payment Receipt - ${invoice.invoiceNumber}`,
+    html: `
+      <h2>Payment Receipt</h2>
 
-export const sendReceiptEmail=async(input:ReceiptEmailInput,):Promise<void>=>{
-    const amount=formatCurrency(
-        input.amount,
-        input.currency,
-    )
+      <p>Hello ${client.name},</p>
 
-    await transporter.sendMail({
-        from:process.env.SMTP_FROM || process.env.SMTP_USER,
-        to:input.recipientEmail,
-        subject:`Payment Receipt - ${input.invoiceNumber}`,
-        text:[
-            `Hello ${input.clientName},`,
-            "",
-            `Your payment for invoice ${input.invoiceNumber} has been successfully received.`,
-            `Amount paid: ${amount}`,
+      <p>
+        Your payment for invoice
+        <strong>${invoice.invoiceNumber}</strong>
+        has been successfully received.
+      </p>
 
-            "",
-            "Your payment receipt is attached to this email.",
-            "",
-            "Thank you for your business.",
-            "",
-            "Nexus Corporate Services",
-        ].join("\n"),
+      <p>
+        Amount: <strong>${invoice.currency.toUpperCase()} ${invoice.amount.toFixed(2)}</strong>
+      </p>
 
-        html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <h2>Payment Received</h2>
+      <p>
+        Please find your payment receipt attached to this email.
+      </p>
 
-        <p>Hello ${input.clientName},</p>
-
-        <p>
-          Your payment for invoice
-          <strong>${input.invoiceNumber}</strong>
-          has been successfully received.
-        </p>
-
-        <p>
-          <strong>Amount Paid:</strong> ${amount}
-        </p>
-
-        <p>
-          Your payment receipt is attached to this email.
-        </p>
-
-        <p>Thank you for your business.</p>
-
-        <p>
-          <strong>Nexus Corporate Services</strong>
-        </p>
-      </div>
+      <p>Thank you,<br/>Nexus Corporate Services</p>
     `,
-
-    attachments:[
-        {
-            filename:`${input.invoiceNumber}-receipt.pdf`,
-            content:input.pdfBuffer,
-            contentType:"application/pdf",
-        },
+    attachments: [
+      {
+        filename: `${invoice.invoiceNumber}-receipt.pdf`,
+        content: receiptPdf.toString("base64"),
+      },
     ],
+  });
 
-    });
+  if (result.error) {
+    throw new Error(`Receipt email failed: ${result.error.message}`);
+  }
+
+  console.log(`Receipt email sent: ${client.email}`);
 };
